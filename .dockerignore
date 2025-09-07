@@ -1,6 +1,20 @@
-# OMRChecker inputs
+# OMRChecker inputs and outputs (large directories)
 inputs
 samples
+outputs
+htmlcov
+
+
+# Additional OMRChecker specific exclusions
+OMRChecker.wiki
+mkdocs.yml
+docs
+scripts/local
+*.log
+pytestdebug.log
+pytest.ini
+uv.lock
+
 
 # Byte-compiled / optimized / DLL files
 **/__pycache__/

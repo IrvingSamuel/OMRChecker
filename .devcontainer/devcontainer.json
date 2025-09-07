@@ -4,8 +4,9 @@
         "context": "..",
         "dockerfile": "Dockerfile",
         "args": {
-            "UV_VERSION": "latest",
-            "DEBIAN_VERSION": "bookworm"
+            "BUILDKIT_INLINE_CACHE": "0",
+            "PYTHON_VERSION": "3.11-bullseye",
+            "UV_VERSION": "latest"
         }
     },
     "features": {
@@ -20,7 +21,6 @@
         // }
     },
     // "forwardPorts": [6080],
-    // "postCreateCommand": "pip3 install -r requirements.txt && sudo apt-get update && sudo apt-get -y install python3-opencv python3-tk"
     "customizations": {
         "codespaces": {
             "openFiles": [
@@ -32,11 +32,12 @@
             "extensions": [
                 "charliermarsh.ruff",
                 "exiasr.hadolint",
+                // "github.copilot.chat.codeGeneration.instructions",
                 "kevinrose.vsc-python-indent",
-                "mosapride.zenkaku",
                 "ms-azuretools.vscode-docker",
                 "ms-python.python",
                 "ms-python.vscode-pylance",
+                "mutantdino.resourcemonitor",
                 "njpwerner.autodocstring",
                 "redhat.vscode-yaml",
                 "shardulm94.trailing-spaces",
@@ -51,7 +52,13 @@
         "UV_LINK_MODE": "copy",
         "UV_PROJECT_ENVIRONMENT": "/home/vscode/.venv"
     },
+    // https://code.visualstudio.com/docs/devcontainers/tips-and-tricks#_persisting-user-profile
+    "mounts": [
+        "source=profile,target=/root,type=volume",
+        "target=/root/.vscode-server,type=volume"
+    ],
     "postCreateCommand": "uv sync --frozen",
+    // "postCreateCommand": "pip3 install -r requirements.txt && sudo apt-get update && sudo apt-get -y install python3-opencv python3-tk"
     "postStartCommand": "uv run pre-commit install",
     "remoteUser": "vscode"
 }
