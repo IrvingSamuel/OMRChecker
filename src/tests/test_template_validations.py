@@ -147,7 +147,10 @@ def test_missing_field_block_labels(mocker) -> None:
 
 def test_missing_output_columns(mocker) -> None:
     def modify_template(template) -> None:
-        template["outputColumns"] = ["qX", "q1..5"]
+        template["outputColumns"] = {
+            "sortType": "CUSTOM",
+            "customOrder": ["qX", "q1..5"],
+        }
 
     _, exception = write_jsons_and_run(mocker, modify_template=modify_template)
     assert str(exception) == (
@@ -157,7 +160,27 @@ def test_missing_output_columns(mocker) -> None:
 
 def test_safe_missing_label_columns(mocker) -> None:
     def modify_template(template) -> None:
-        template["outputColumns"] = ["q1..4"]
+        template["outputColumns"] = {"sortType": "CUSTOM", "customOrder": ["q1..4"]}
 
     _, exception = write_jsons_and_run(mocker, modify_template=modify_template)
     assert str(exception) == "No Error"
+
+
+def test_invalid_sort_type(mocker) -> None:
+    def modify_template(template) -> None:
+        template["outputColumns"] = {"sortType": "ABC"}
+
+    _, exception = write_jsons_and_run(mocker, modify_template=modify_template)
+    assert str(exception) == (
+        "Provided Template JSON is Invalid: 'src/tests/test_samples/sample1/template.json'"
+    )
+
+
+def test_invalid_sort_order(mocker) -> None:
+    def modify_template(template) -> None:
+        template["outputColumns"] = {"sortOrder": "ABC"}
+
+    _, exception = write_jsons_and_run(mocker, modify_template=modify_template)
+    assert str(exception) == (
+        "Provided Template JSON is Invalid: 'src/tests/test_samples/sample1/template.json'"
+    )
