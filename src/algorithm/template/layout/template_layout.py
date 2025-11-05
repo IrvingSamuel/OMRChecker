@@ -10,7 +10,7 @@ from src.utils.image import ImageUtils
 from src.utils.interaction import InteractionUtils
 from src.utils.logger import logger
 from src.utils.parsing import (
-    custom_sort_output_columns,
+    alphanumerical_sort_key,
     default_dump,
     open_template_with_defaults,
     parse_fields,
@@ -38,7 +38,7 @@ class TemplateLayout:
         alignment_object = json_object["alignment"]
         custom_bubble_field_types = json_object["customBubbleFieldTypes"]
         custom_labels_object = json_object["customLabels"]
-        output_columns_array = json_object["outputColumns"]
+        output_columns = json_object["outputColumns"]
         self.field_blocks_offset = json_object["fieldBlocksOffset"]
         self.global_empty_val = json_object["emptyValue"]
 
@@ -52,7 +52,7 @@ class TemplateLayout:
         )
         # TODO: support for "sortFiles" key
 
-        self.parse_output_columns(output_columns_array)
+        self.parse_output_columns(output_columns)
 
         # TODO: move outside
         self.setup_pre_processors(pre_processors_object, template_path.parent)
@@ -69,7 +69,9 @@ class TemplateLayout:
         )
 
         if len(self.output_columns) == 0:
-            self.fill_output_columns(non_custom_columns, all_custom_columns)
+            self.fill_output_columns(
+                non_custom_columns, all_custom_columns, output_columns
+            )
 
         self.validate_template_columns(non_custom_columns, all_custom_columns)
 
@@ -161,8 +163,20 @@ class TemplateLayout:
 
         return gray_image, colored_image, template_layout
 
-    def parse_output_columns(self, output_columns_array) -> None:
-        self.output_columns = parse_fields("Output Columns", output_columns_array)
+    def parse_output_columns(self, output_columns):
+        custom_order = output_columns.get("customOrder")
+        sort_type = output_columns.get("sortType")
+
+        # Make sure sort_type is set to CUSTOM if output columns are custom
+        if len(custom_order) > 0 and sort_type != "CUSTOM":
+            logger.critical(
+                "Custom output columns are passed but sort_type is not"
+                "CUSTOM: {sort_type}. Please set sortType to CUSTOM in outputColumns."
+            )
+            error_message = f"Invalid sort type: {sort_type} for custom columns"
+            raise Exception(error_message)
+
+        self.output_columns = parse_fields("Output Columns", custom_order)
 
     def setup_pre_processors(self, pre_processors_object, relative_dir) -> None:
         # load image pre_processors
@@ -309,12 +323,21 @@ class TemplateLayout:
 
         return concatenated_omr_response
 
-    def fill_output_columns(self, non_custom_columns, all_custom_columns) -> None:
+    def fill_output_columns(
+        self, non_custom_columns, all_custom_columns, output_columns
+    ):
         all_template_columns = non_custom_columns + all_custom_columns
-        # Typical case: sort alpha-numerical (natural sort)
-        self.output_columns = sorted(
-            all_template_columns, key=custom_sort_output_columns
-        )
+        sort_type = output_columns.get("sortType")
+
+        sort_order = output_columns.get("sortOrder", "ASC")
+        reverse = sort_order == "DESC"
+
+        if sort_type == "ALPHANUMERIC":
+            self.output_columns = sorted(
+                all_template_columns, key=alphanumerical_sort_key, reverse=reverse
+            )
+        else:
+            self.output_columns = sorted(all_template_columns, reverse=reverse)
 
     def validate_template_columns(self, non_custom_columns, all_custom_columns) -> None:
         output_columns_set = set(self.output_columns)

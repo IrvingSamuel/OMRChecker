@@ -112,7 +112,7 @@ def parse_field_string(field_string) -> list[str]:
     return [field_string]
 
 
-def custom_sort_output_columns(field_label) -> list[Any | int]:
+def alphanumerical_sort_key(field_label):
     label_prefix, label_suffix = re.findall(FIELD_LABEL_NUMBER_REGEX, field_label)[0]
     return [label_prefix, int(label_suffix) if len(label_suffix) > 0 else 0, 0]
 

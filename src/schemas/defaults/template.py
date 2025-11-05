@@ -10,7 +10,11 @@ TEMPLATE_DEFAULTS = {
     "emptyValue": "",
     "fieldBlocks": {},
     "fieldBlocksOffset": [0, 0],
-    "outputColumns": [],
+    "outputColumns": {
+        "customOrder": [],
+        "sortType": "ALPHANUMERIC",
+        "sortOrder": "ASC",
+    },
     "preProcessors": [],
     "processingImageShape": [900, 650],
     "sortFiles": {
