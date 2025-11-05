@@ -33,13 +33,14 @@ jobs:
       - name: Creating .github-pytest and coverage folders
         run: mkdir -p ./.github-pytest/coverage
 
-      - name: Run pytest (with TZ=Asia/Kolkata)
+      - name: Run pytest
         run: |
           set -o pipefail
           uv run pytest --cov-fail-under=70 --junitxml=./.github-pytest/pytest-output.xml | tee .github-pytest/pytest-coverage.txt
         env:
           OMR_CHECKER_CONTAINER: true
-          TZ: Asia/Kolkata
+          # Note: TZ override no longer needed as we're now setting it during test execution itself.
+          # TZ: Asia/Kolkata
 
       - name: Pytest coverage comment
         uses: MishaKav/pytest-coverage-comment@v1

@@ -2,6 +2,7 @@ import json
 import os
 from collections.abc import Callable
 from copy import deepcopy
+from datetime import timedelta
 from pathlib import Path
 from typing import Literal
 
@@ -32,12 +33,17 @@ def run_entry_point(input_path, output_dir) -> None:
         "setLayout": False,
         "outputMode": "default",
     }
-    with freeze_time(FROZEN_TIMESTAMP):
+
+    with freeze_time(FROZEN_TIMESTAMP, tz_offset=timedelta(hours=0, minutes=0)):
         # ruff: noqa: PLC0415
+        os.environ["TZ"] = "UTC"
         import time
 
-        frozen_time = time.time()
-        assert frozen_time == 0, f"Frozen time is not 0: {frozen_time}"
+        time.tzset()
+        frozen_localtime = time.localtime()
+        assert frozen_localtime.tm_hour == 0, (
+            f"Frozen localtime is not 0: got {frozen_localtime.tm_hour}"
+        )
         entry_point_for_args(args)
 
 

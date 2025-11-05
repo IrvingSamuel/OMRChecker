@@ -9,7 +9,7 @@ from src.tests.utils import (
 )
 from src.utils.logger import logger
 
-FROZEN_TIMESTAMP = "1970-01-01"
+FROZEN_TIMESTAMP = "1970-01-01 00:00:00+00:00"
 CURRENT_DIR = Path("src/tests")
 BASE_SAMPLE_PATH = CURRENT_DIR.joinpath("test_samples", "sample1")
 BASE_SAMPLE_TEMPLATE_PATH = BASE_SAMPLE_PATH.joinpath("template.json")
