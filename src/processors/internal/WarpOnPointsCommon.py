@@ -186,7 +186,7 @@ class WarpOnPointsCommon(ImageTemplatePreprocessor):
                 f"Anchor Points: {self}", range(3, 7), self.debug_image
             )
 
-        if config.outputs.show_image_level >= 4:
+        if config.outputs.show_image_level >= 5:
             InteractionUtils.show(
                 f"{title_prefix} Preview of Warp: {file_path}",
                 warped_image,

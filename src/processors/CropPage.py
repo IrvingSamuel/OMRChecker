@@ -12,7 +12,7 @@ from src.utils.interaction import InteractionUtils
 from src.utils.logger import logger
 from src.utils.math import MathUtils
 
-MIN_PAGE_AREA = 80000
+MIN_PAGE_AREA = 8000
 
 """
 ref: https://www.pyimagesearch.com/2015/04/06/zero-parameter-automatic-canny-edge-detection-with-python-and-opencv/
@@ -115,7 +115,7 @@ class CropPage(WarpOnPointsCommon):
                 "Cannot process colored image for CropPage. useColoredCanny is true but colored_outputs_enabled is false."
             )
 
-        _ret, image = cv2.threshold(image, 200, 255, cv2.THRESH_TRUNC)
+        _ret, image = cv2.threshold(image, 210, 255, cv2.THRESH_TRUNC)
         image = ImageUtils.normalize(image)
 
         self.append_save_image("Truncate Threshold", [1, 4, 5, 6], image)
@@ -141,7 +141,9 @@ class CropPage(WarpOnPointsCommon):
             image = ImageUtils.normalize(image)
 
             # Close the small holes, i.e. Complete the edges on canny image
-            closed = cv2.morphologyEx(image, cv2.MORPH_CLOSE, self.morph_kernel)
+            closed = image
+            if self.options["morphKernel"][0] > 1:
+                closed = cv2.morphologyEx(image, cv2.MORPH_CLOSE, self.morph_kernel)
 
             self.append_save_image("Morph Page", range(3, 7), closed)
 
