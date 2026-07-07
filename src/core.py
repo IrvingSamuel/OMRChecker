@@ -10,6 +10,7 @@ from src.constants.common import (
     CLR_BLACK,
     CLR_DARK_GRAY,
     CLR_GRAY,
+    CLR_RESCUE_ORANGE,
     GLOBAL_PAGE_THRESHOLD_BLACK,
     GLOBAL_PAGE_THRESHOLD_WHITE,
     TEXT_SIZE,
@@ -251,6 +252,16 @@ class ImageInstanceOps:
             # , "Mean Intensity Histogram",plot_show=True, sort_in_plot=True)
             global_thr, _, _ = self.get_global_threshold(all_q_vals, looseness=4)
 
+            # Local patch (rescue de bolha diluída) - ver RESCUE_ABS_DELTA/
+            # RESCUE_MIN_ROW_GAP em defaults/config.py e o uso em
+            # detected_bubbles abaixo. Estatística da página inteira sobre as
+            # bolhas "claramente não marcadas" (lado claro do global_thr),
+            # reaproveitando all_q_vals já coletado - nenhuma passada extra.
+            blank_side_vals = [v for v in all_q_vals if v >= global_thr]
+            blank_baseline_mean = (
+                float(np.mean(blank_side_vals)) if blank_side_vals else 255.0
+            )
+
             logger.info(
                 f"Thresholding: \tglobal_thr: {round(global_thr, 2)} \tglobal_std_THR: {round(global_std_thresh, 2)}\t{'(Looks like a Xeroxed OMR)' if (global_thr == 255) else ''}"
             )
@@ -272,6 +283,9 @@ class ImageInstanceOps:
                 shift = field_block.shift
                 s, d = field_block.origin, field_block.dimensions
                 key = field_block.name[:3]
+                # Candidatos a resgate deste bloco ficam pendentes até o fim
+                # das suas linhas - ver filtro de viés sistemático abaixo.
+                block_rescue_candidates = []
                 # cv2.rectangle(final_marked,(s[0]+shift,s[1]),(s[0]+shift+d[0],
                 #   s[1]+d[1]),CLR_BLACK,3)
                 for field_block_bubbles in field_block.traverse_bubbles:
@@ -364,7 +378,23 @@ class ImageInstanceOps:
 
                     if len(detected_bubbles) == 0:
                         field_label = field_block_bubbles[0].field_label
-                        omr_response[field_label] = field_block.empty_val
+                        rescued_bubble = self.rescue_diluted_mark(
+                            field_block_bubbles,
+                            all_q_strip_arrs[total_q_strip_no],
+                            blank_baseline_mean,
+                            config.threshold_params,
+                        )
+                        if rescued_bubble is not None:
+                            block_rescue_candidates.append(
+                                (
+                                    field_label,
+                                    rescued_bubble,
+                                    field_block_bubbles.index(rescued_bubble),
+                                    all_q_strip_arrs[total_q_strip_no],
+                                )
+                            )
+                        else:
+                            omr_response[field_label] = field_block.empty_val
 
                     if config.outputs.show_image_level >= 5:
                         if key in all_c_box_vals:
@@ -375,6 +405,16 @@ class ImageInstanceOps:
 
                     block_q_strip_no += 1
                     total_q_strip_no += 1
+
+                self.commit_rescue_candidates(
+                    block_rescue_candidates,
+                    field_block,
+                    box_w,
+                    box_h,
+                    blank_baseline_mean,
+                    omr_response,
+                    final_marked,
+                )
                 # /for field_block
 
             per_omr_threshold_avg /= total_q_strip_no
@@ -699,6 +739,119 @@ class ImageInstanceOps:
             if plot_show:
                 plt.show()
         return thr1
+
+    def rescue_diluted_mark(
+        self, field_block_bubbles, q_strip_vals, blank_baseline_mean, threshold_params
+    ):
+        """
+        Local patch: rede de segurança para quando NENHUMA bolha da questão
+        cruzou o threshold local/global (per_q_strip_threshold), mas uma
+        bolha ainda é visivelmente mais escura que o "branco" típico da
+        página - sintoma de uma amostragem diluída (ex: caixa de amostragem
+        levemente desalinhada com a bolha real impressa), não de uma questão
+        genuinamente em branco.
+
+        Exige DUAS condições (nunca uma só) para evitar marcar sombra/vinco
+        uniforme como resposta:
+          1) escuridão absoluta: a bolha mais escura da linha está pelo menos
+             RESCUE_ABS_DELTA mais escura que a média das bolhas "claramente
+             não marcadas" da página inteira (blank_baseline_mean).
+          2) discriminação interna: a bolha mais escura está pelo menos
+             RESCUE_MIN_ROW_GAP mais escura que a 2a mais escura DA MESMA
+             LINHA - garante que há uma única bolha se destacando, não 4
+             valores parecidos (que indicariam sombra uniforme, não marca).
+
+        RESCUE_ABS_DELTA=0 (padrão) desativa completamente - devolve None
+        sempre, preservando o comportamento original do OMRChecker.
+        """
+        rescue_abs_delta = threshold_params.get("RESCUE_ABS_DELTA", 0)
+        if rescue_abs_delta <= 0:
+            return None
+
+        rescue_min_row_gap = threshold_params.get("RESCUE_MIN_ROW_GAP", 8)
+        sorted_vals = sorted(q_strip_vals)
+        darkest_val, second_darkest_val = sorted_vals[0], sorted_vals[1]
+
+        absolute_darkness = blank_baseline_mean - darkest_val
+        internal_gap = second_darkest_val - darkest_val
+        if absolute_darkness < rescue_abs_delta or internal_gap < rescue_min_row_gap:
+            return None
+
+        darkest_index = q_strip_vals.index(darkest_val)
+        return field_block_bubbles[darkest_index]
+
+    def commit_rescue_candidates(
+        self,
+        block_rescue_candidates,
+        field_block,
+        box_w,
+        box_h,
+        blank_baseline_mean,
+        omr_response,
+        final_marked,
+    ):
+        """
+        Confirma (ou descarta) os resgates pendentes de UM field_block inteiro.
+
+        Um defeito fixo de alinhamento (ex: a caixa de amostragem de uma
+        coluna específica cai sobre um elemento impresso, não sobre a bolha)
+        também produz "essa coluna é a mais escura" de forma consistente -
+        mas em VÁRIAS linhas do mesmo bloco, não numa só. Uma marca real de
+        aluno nunca repete a mesma coluna em quase todas as linhas de uma
+        prova (isso pode acontecer por coincidência em 1-2 linhas, não na
+        maioria). Por isso, se uma coluna aparece como candidata a resgate em
+        muitas linhas do MESMO bloco nesta página, é mais provável ser viés
+        geométrico do que resposta genuína - descarta esses casos.
+        """
+        if not block_rescue_candidates:
+            return
+
+        n_rows = len(field_block.traverse_bubbles)
+        column_counts = defaultdict(int)
+        for _, _, column_index, _ in block_rescue_candidates:
+            column_counts[column_index] += 1
+        suspect_columns = {
+            col
+            for col, count in column_counts.items()
+            if count >= max(3, -(-n_rows // 2))  # ceil(n_rows / 2)
+        }
+
+        for field_label, bubble, column_index, q_strip_vals in block_rescue_candidates:
+            if column_index in suspect_columns:
+                logger.warning(
+                    f"Resgate descartado (viés sistemático na coluna {column_index} "
+                    f"do bloco {field_block.name}): {field_label} ficará em branco. "
+                    f"values={q_strip_vals}"
+                )
+                omr_response[field_label] = field_block.empty_val
+                continue
+
+            x, y, field_value = (
+                bubble.x + field_block.shift,
+                bubble.y,
+                bubble.field_value,
+            )
+            omr_response[field_label] = field_value
+            logger.warning(
+                f"Rescued diluted mark: {field_label} -> {field_value} "
+                f"(blank_baseline={round(blank_baseline_mean, 1)}, values={q_strip_vals})"
+            )
+            cv2.rectangle(
+                final_marked,
+                (int(x + box_w / 12), int(y + box_h / 12)),
+                (int(x + box_w - box_w / 12), int(y + box_h - box_h / 12)),
+                CLR_RESCUE_ORANGE,
+                3,
+            )
+            cv2.putText(
+                final_marked,
+                str(field_value),
+                (x, y),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                TEXT_SIZE,
+                (20, 20, 10),
+                int(1 + 3.5 * TEXT_SIZE),
+            )
 
     def append_save_img(self, key, img):
         if self.save_image_level >= int(key):

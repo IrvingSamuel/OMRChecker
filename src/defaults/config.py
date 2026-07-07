@@ -15,6 +15,11 @@ CONFIG_DEFAULTS = DotMap(
             "CONFIDENT_SURPLUS": 5,
             "JUMP_DELTA": 30,
             "PAGE_TYPE_FOR_THRESHOLD": "white",
+            # Resgate de bolha diluída: 0 desativa (comportamento original).
+            # Ver ImageInstanceOps.read_omr_response - só entra em jogo quando
+            # nenhuma bolha da questão cruzou o threshold local/global.
+            "RESCUE_ABS_DELTA": 0,
+            "RESCUE_MIN_ROW_GAP": 8,
         },
         "alignment_params": {
             # Note: 'auto_align' enables automatic template alignment, use if the scans show slight misalignments.

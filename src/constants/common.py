@@ -56,6 +56,9 @@ CLR_BLACK = (50, 150, 150)
 CLR_WHITE = (250, 250, 250)
 CLR_GRAY = (130, 130, 130)
 CLR_DARK_GRAY = (100, 100, 100)
+# Marca bolhas recuperadas pelo rescue de bolha diluída (RESCUE_ABS_DELTA) -
+# distinta das cores normais para ficar auditável no CheckedOMRs.
+CLR_RESCUE_ORANGE = (0, 140, 255)
 
 # TODO: move to config.json
 GLOBAL_PAGE_THRESHOLD_WHITE = 200

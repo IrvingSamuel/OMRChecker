@@ -29,6 +29,8 @@ CONFIG_SCHEMA = {
                     "enum": ["white", "black"],
                     "type": "string",
                 },
+                "RESCUE_ABS_DELTA": {"type": "integer", "minimum": 0, "maximum": 100},
+                "RESCUE_MIN_ROW_GAP": {"type": "integer", "minimum": 0, "maximum": 50},
             },
         },
         "alignment_params": {
